@@ -46,8 +46,7 @@ def lista_musicas(request):
         'query': query
     })
 
-import os
-import yt_dlp
+import requests
 from django.shortcuts import redirect
 from django.http import HttpResponse
 
@@ -55,29 +54,34 @@ def baixar_musica(request, video_id):
     try:
         url_youtube = f'https://www.youtube.com/watch?v={video_id}'
         
-        # Caminho para o arquivo de cookies
-        cookie_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cookies.txt')
-
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'quiet': True,
-            'no_warnings': True,
-            'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'ios']
-                }
-            }
+        # Endpoint de API publica do Cobalt (servico robusto para download)
+        api_url = "https://co.wuk.sh/api/json"
+        
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
         }
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url_youtube, download=False)
-            url_stream = info.get('url')
-            
-            if url_stream:
-                return redirect(url_stream)
-            else:
-                return HttpResponse("Não foi possível gerar o link de áudio.", status=500)
-                
+        payload = {
+            "url": url_youtube,
+            "downloadMode": "audio",
+            "audioFormat": "mp3"
+        }
+        
+        response = requests.post(api_url, json=payload, headers=headers)
+        data = response.json()
+        
+        # Obtem a URL do arquivo de audio gerado pela API
+        if response.status_code == 200 and "url" in data:
+            return redirect(data["url"])
+        else:
+            # Fallback caso a API principal esteja ocupada
+            fallback_url = f"https://api.cobalt.tools/api/json"
+            fb_response = requests.post(fallback_url, json=payload, headers=headers)
+            fb_data = fb_response.json()
+            if "url" in fb_data:
+                return redirect(fb_data["url"])
+            return HttpResponse("Erro ao gerar link de download pela API.", status=500)
+
     except Exception as e:
-        return HttpResponse(f"Erro ao processar áudio: {str(e)}", status=500)
+        return HttpResponse(f"Erro no processamento: {str(e)}", status=500)

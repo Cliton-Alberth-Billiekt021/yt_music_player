@@ -1,0 +1,1 @@
+web: gunicorn yt_music_player.wsgi

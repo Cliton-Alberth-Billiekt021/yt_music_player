@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Official Music Downloader</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #121212; color: #FFFFFF; padding: 30px 20px; }
+        
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { color: #1DB954; font-size: 2.5rem; margin-bottom: 10px; }
+        .header p { color: #B3B3B3; font-size: 1rem; }
+
+        /* Container de Anúncios Estilizado */
+        .ad-container {
+            width: 100%;
+            max-width: 728px;
+            margin: 0 auto 25px auto;
+            padding: 10px;
+            background-color: #181818;
+            border: 1px dashed #333;
+            border-radius: 8px;
+            text-align: center;
+            min-height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 0.85rem;
+        }
+
+        /* Barra de Pesquisa estilo Spotify */
+        .search-box { display: flex; justify-content: center; margin-bottom: 30px; }
+        .search-box form { display: flex; width: 100%; max-width: 600px; gap: 10px; }
+        .search-box input {
+            flex: 1; padding: 14px 20px; border-radius: 50px; border: none;
+            background-color: #242424; color: white; font-size: 1rem; outline: none;
+        }
+        .search-box input:focus { border: 2px solid #1DB954; }
+        .search-box button {
+            background-color: #1DB954; border: none; color: black; font-weight: bold;
+            padding: 14px 25px; border-radius: 50px; cursor: pointer; transition: 0.2s;
+        }
+        .search-box button:hover { background-color: #1ed760; transform: scale(1.05); }
+
+        /* Grid de Músicas */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .card {
+            background-color: #181818; padding: 16px; border-radius: 8px;
+            transition: background-color 0.3s; display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .card:hover { background-color: #282828; }
+        .card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 6px; margin-bottom: 12px; }
+        .card h3 { font-size: 1rem; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card p { font-size: 0.85rem; color: #B3B3B3; margin-bottom: 15px; }
+        
+        /* Botão de Download */
+        .btn-download {
+            display: inline-block; text-align: center; background-color: #1DB954;
+            color: black; text-decoration: none; font-weight: bold; padding: 10px;
+            border-radius: 20px; font-size: 0.9rem; transition: 0.2s;
+        }
+        .btn-download:hover { background-color: #1ed760; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🎧 Official Music Downloader</h1>
+        <p>Busque e baixe músicas em MP3 diretamente</p>
+    </div>
+
+    <!-- 📢 ESPAÇO DE ANÚNCIO 1: TOPO (BANNER RECTANGLE/LEADERBOARD) -->
+    <div class="ad-container">
+        <!-- Cole o código do script de anúncio aqui no futuro -->
+        <span>[ Espaço reservado para Anúncio / Banner Topo ]</span>
+    </div>
+
+    <!-- Campo de Busca -->
+    <div class="search-box">
+        <form method="GET" action="{% url 'lista_musicas' %}">
+            <input type="text" name="q" placeholder="Digite o nome da música ou artista..." value="{{ query }}">
+            <button type="submit">Buscar</button>
+        </form>
+    </div>
+
+    <!-- 📢 ESPAÇO DE ANÚNCIO 2: NATIVO ANTES DOS RESULTADOS -->
+    {% if resultados %}
+        <div class="ad-container" style="min-height: 60px; margin-bottom: 30px;">
+            <!-- Cole o código de anúncio nativo aqui no futuro -->
+            <span>[ Espaço reservado para Anúncio Nativo ]</span>
+        </div>
+    {% endif %}
+
+    <!-- Resultados -->
+    {% if resultados %}
+        <div class="grid">
+            {% for item in resultados %}
+                <div class="card">
+                    <div>
+                        <img src="{{ item.capa }}" alt="Capa">
+                        <h3>{{ item.titulo }}</h3>
+                        <p>{{ item.artista }} • {{ item.duracao }}</p>
+                    </div>
+                    <a href="{% url 'baixar_musica' item.id %}" class="btn-download">⬇ Baixar MP3</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% elif query %}
+        <p style="text-align: center; color: #B3B3B3;">Nenhuma música encontrada para "{{ query }}".</p>
+    {% endif %}
+
+</body>
+</html>

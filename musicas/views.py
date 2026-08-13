@@ -46,53 +46,34 @@ def lista_musicas(request):
         'query': query
     })
 
+import yt_dlp
+from django.shortcuts import redirect, render
+from django.http import HttpResponse
+
 def baixar_musica(request, video_id):
-    """
-    Faz o download do áudio em MP3 usando o FFmpeg embutido
-    e entrega o arquivo com o nome do título real da música
-    """
-    url = f"https://www.youtube.com/watch?v={video_id}"
-    media_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'downloads')
-    os.makedirs(media_folder, exist_ok=True)
-
-    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-
-    # Define o nome temporário padrão para o download
-    output_template = os.path.join(media_folder, '%(title)s.%(ext)s')
-
-   ydl_opts = {
-    'format': 'bestaudio/best',
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
-    # Força a usar clientes do YouTube que não pedem bot check agressivo:
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'ios']
-        }
-    },
-    'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
-}
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            titulo = info.get('title', video_id)
-            # Limpa caracteres especiais inválidos para nomes de arquivos no Windows
-            titulo_limpo = "".join([c for c in titulo if c.isalpha() or c.isdigit() or c in ' -_']).strip()
-
-        file_path = os.path.join(media_folder, f"{titulo}.mp3")
+        url_youtube = f'https://www.youtube.com/watch?v={video_id}'
         
-        # Caso o sistema renomeie na pasta:
-        if not os.path.exists(file_path):
-            # Procura o arquivo MP3 gerado mais recente na pasta downloads
-            files = [os.path.join(media_folder, f) for f in os.listdir(media_folder) if f.endswith('.mp3')]
-            file_path = max(files, key=os.path.getmtime)
-
-        response = FileResponse(open(file_path, 'rb'), as_attachment=True)
-        response['Content-Disposition'] = f'attachment; filename="{titulo_limpo}.mp3"'
-        return response
-
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios']
+                }
+            }
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url_youtube, download=False)
+            url_stream = info.get('url')
+            
+            # Redireciona o navegador diretamente para a URL de transmissão do áudio
+            if url_stream:
+                return redirect(url_stream)
+            else:
+                return HttpResponse("Não foi possível gerar o link de áudio.", status=500)
+                
     except Exception as e:
-        raise Http404(f"Erro ao baixar áudio: {str(e)}")
+        return HttpResponse(f"Erro ao processar áudio: {str(e)}", status=500)

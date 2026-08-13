@@ -78,44 +78,49 @@ def baixar_musica(request, video_id):
     ou redireciona direto se já for um link de áudio MP3 (Jamendo).
     """
     try:
-        # 1. Se for Jamendo (ou URL direta do MP3)
+        # 1. Se for Jamendo (ou URL direta de áudio/MP3)
         if video_id.startswith('http://') or video_id.startswith('https://'):
             if 'soundcloud.com' not in video_id:
                 return redirect(video_id)
-            target_url = video_id  # É uma URL nativa do SoundCloud
+            target_url = video_id  # Link nativo do SoundCloud
         else:
-            # 2. É um ID simples do YouTube
+            # 2. Se for ID simples do YouTube
             target_url = f'https://www.youtube.com/watch?v={video_id}'
 
-        # Endpoint de extração via Cobalt
-        api_url = "https://co.wuk.sh/api/json"
+        # Instâncias oficiais e ativas da API do Cobalt
+        instancias_cobalt = [
+            "https://api.cobalt.tools/",
+            "https://cobalt-api.kwi.mobi/"
+        ]
+
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json"
         }
+        
         payload = {
             "url": target_url,
             "downloadMode": "audio",
             "audioFormat": "mp3"
         }
-        
-        response = requests.post(api_url, json=payload, headers=headers)
-        data = response.json()
-        
-        if response.status_code == 200 and "url" in data:
-            return redirect(data["url"])
-        else:
-            # Fallback caso a API principal oscile
-            fallback_url = "https://api.cobalt.tools/api/json"
-            fb_response = requests.post(fallback_url, json=payload, headers=headers)
-            fb_data = fb_response.json()
-            if "url" in fb_data:
-                return redirect(fb_data["url"])
-            return HttpResponse("Erro ao gerar link de download pela API.", status=500)
+
+        # Tenta a requisição nas instâncias
+        for api_url in instancias_cobalt:
+            try:
+                response = requests.post(api_url, json=payload, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if "url" in data:
+                        return redirect(data["url"])
+            except Exception as req_err:
+                print(f"Falha na instância {api_url}: {req_err}")
+                continue
+
+        return HttpResponse("Não foi possível gerar o link de download no momento. Tente novamente em instantes.", status=500)
 
     except Exception as e:
         return HttpResponse(f"Erro no processamento: {str(e)}", status=500)
-
+        
 def detalhe_musica(request, video_id):
     """
     Retorna os dados da música selecionada + lista de recomendações/feats

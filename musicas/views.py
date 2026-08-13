@@ -74,53 +74,45 @@ def lista_musicas(request):
 
 def baixar_musica(request, video_id):
     """
-    Gera link de download via API do Cobalt (suporta YouTube e SoundCloud)
-    ou redireciona direto se já for um link de áudio MP3 (Jamendo).
+    Extrai o link de áudio via yt_dlp ou redireciona caso já seja MP3 direto (Jamendo).
     """
     try:
-        # 1. Se for Jamendo (ou URL direta de áudio/MP3)
+        # 1. Se for Jamendo (link direto para o arquivo MP3)
+        if (video_id.startswith('http://') or video_id.startswith('https://')) and 'soundcloud.com' not in video_id:
+            return redirect(video_id)
+
+        # 2. Monta a URL para processar (SoundCloud ou YouTube)
         if video_id.startswith('http://') or video_id.startswith('https://'):
-            if 'soundcloud.com' not in video_id:
-                return redirect(video_id)
-            target_url = video_id  # Link nativo do SoundCloud
+            target_url = video_id
         else:
-            # 2. Se for ID simples do YouTube
             target_url = f'https://www.youtube.com/watch?v={video_id}'
 
-        # Instâncias oficiais e ativas da API do Cobalt
-        instancias_cobalt = [
-            "https://api.cobalt.tools/",
-            "https://cobalt-api.kwi.mobi/"
-        ]
-
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "url": target_url,
-            "downloadMode": "audio",
-            "audioFormat": "mp3"
+        # 3. Usa o yt_dlp para extrair a URL direta de streaming/áudio
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
         }
 
-        # Tenta a requisição nas instâncias
-        for api_url in instancias_cobalt:
-            try:
-                response = requests.post(api_url, json=payload, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    data = response.json()
-                    if "url" in data:
-                        return redirect(data["url"])
-            except Exception as req_err:
-                print(f"Falha na instância {api_url}: {req_err}")
-                continue
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(target_url, download=False)
+            
+            # Se for uma playlist ou busca, pega a primeira entrada
+            if 'entries' in info:
+                info = info['entries'][0]
+                
+            audio_url = info.get('url')
 
-        return HttpResponse("Não foi possível gerar o link de download no momento. Tente novamente em instantes.", status=500)
+            if audio_url:
+                # Redireciona para o link de áudio gerado
+                return redirect(audio_url)
+
+        return HttpResponse("Não foi possível extrair o link de áudio dessa faixa.", status=500)
 
     except Exception as e:
-        return HttpResponse(f"Erro no processamento: {str(e)}", status=500)
-        
+        print(f"Erro no download: {e}")
+        return HttpResponse(f"Erro ao processar download: {str(e)}", status=500)
+
 def detalhe_musica(request, video_id):
     """
     Retorna os dados da música selecionada + lista de recomendações/feats

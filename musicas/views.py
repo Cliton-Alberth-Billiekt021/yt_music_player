@@ -60,18 +60,21 @@ def baixar_musica(request, video_id):
     # Define o nome temporário padrão para o download
     output_template = os.path.join(media_folder, '%(title)s.%(ext)s')
 
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': output_template,
-        'ffmpeg_location': ffmpeg_exe,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'quiet': True,
-    }
-
+   ydl_opts = {
+    'format': 'bestaudio/best',
+    'postprocessors': [{
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'mp3',
+        'preferredquality': '192',
+    }],
+    # Força a usar clientes do YouTube que não pedem bot check agressivo:
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'ios']
+        }
+    },
+    'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
+}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)

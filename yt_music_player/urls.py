@@ -21,5 +21,5 @@ from musicas.views import lista_musicas, baixar_musica
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', lista_musicas, name='lista_musicas'),
-    path('baixar/<str:video_id>/', baixar_musica, name='baixar_musica'),
+    path('baixar/<path:video_id>/', baixar_musica, name='baixar_musica'),
 ]

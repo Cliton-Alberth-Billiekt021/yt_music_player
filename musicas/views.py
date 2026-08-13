@@ -74,19 +74,27 @@ def lista_musicas(request):
 
 def baixar_musica(request, video_id):
     """
-    Gera link de download redirecionando via API do Cobalt.
+    Gera link de download via API do Cobalt (suporta YouTube e SoundCloud)
+    ou redireciona direto se já for um link de áudio MP3 (Jamendo).
     """
     try:
-        url_youtube = f'https://www.youtube.com/watch?v={video_id}'
+        # 1. Se for Jamendo (ou URL direta do MP3)
+        if video_id.startswith('http://') or video_id.startswith('https://'):
+            if 'soundcloud.com' not in video_id:
+                return redirect(video_id)
+            target_url = video_id  # É uma URL nativa do SoundCloud
+        else:
+            # 2. É um ID simples do YouTube
+            target_url = f'https://www.youtube.com/watch?v={video_id}'
+
+        # Endpoint de extração via Cobalt
         api_url = "https://co.wuk.sh/api/json"
-        
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json"
         }
-        
         payload = {
-            "url": url_youtube,
+            "url": target_url,
             "downloadMode": "audio",
             "audioFormat": "mp3"
         }
@@ -97,6 +105,7 @@ def baixar_musica(request, video_id):
         if response.status_code == 200 and "url" in data:
             return redirect(data["url"])
         else:
+            # Fallback caso a API principal oscile
             fallback_url = "https://api.cobalt.tools/api/json"
             fb_response = requests.post(fallback_url, json=payload, headers=headers)
             fb_data = fb_response.json()
@@ -106,7 +115,6 @@ def baixar_musica(request, video_id):
 
     except Exception as e:
         return HttpResponse(f"Erro no processamento: {str(e)}", status=500)
-
 
 def detalhe_musica(request, video_id):
     """

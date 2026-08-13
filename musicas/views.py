@@ -46,18 +46,23 @@ def lista_musicas(request):
         'query': query
     })
 
+import os
 import yt_dlp
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect
 from django.http import HttpResponse
 
 def baixar_musica(request, video_id):
     try:
         url_youtube = f'https://www.youtube.com/watch?v={video_id}'
         
+        # Caminho para o arquivo de cookies
+        cookie_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cookies.txt')
+
         ydl_opts = {
             'format': 'bestaudio/best',
             'quiet': True,
             'no_warnings': True,
+            'cookiefile': cookie_path if os.path.exists(cookie_path) else None,
             'extractor_args': {
                 'youtube': {
                     'player_client': ['android', 'ios']
@@ -69,7 +74,6 @@ def baixar_musica(request, video_id):
             info = ydl.extract_info(url_youtube, download=False)
             url_stream = info.get('url')
             
-            # Redireciona o navegador diretamente para a URL de transmissão do áudio
             if url_stream:
                 return redirect(url_stream)
             else:

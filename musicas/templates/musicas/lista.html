@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Official Music Downloader</title>
+    
+    <!-- Bootstrap 5 CSS para os cards de sugestão e badges de feat -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #121212; color: #FFFFFF; padding: 30px 20px; }
@@ -44,22 +48,23 @@
         }
         .search-box button:hover { background-color: #1ed760; transform: scale(1.05); }
 
-        /* Grid de Músicas */
+        /* Grid de Músicas Principal */
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
-        .card {
+        .card-musica {
             background-color: #181818; padding: 16px; border-radius: 8px;
             transition: background-color 0.3s; display: flex; flex-direction: column; justify-content: space-between;
         }
-        .card:hover { background-color: #282828; }
-        .card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 6px; margin-bottom: 12px; }
-        .card h3 { font-size: 1rem; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .card p { font-size: 0.85rem; color: #B3B3B3; margin-bottom: 15px; }
+        .card-musica:hover { background-color: #282828; }
+        .card-musica img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 6px; margin-bottom: 12px; }
+        .card-musica h3 { font-size: 1rem; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-musica p { font-size: 0.85rem; color: #B3B3B3; margin-bottom: 15px; }
         
         /* Botão de Download */
         .btn-download {
             display: inline-block; text-align: center; background-color: #1DB954;
             color: black; text-decoration: none; font-weight: bold; padding: 10px;
-            border-radius: 20px; font-size: 0.9rem; transition: 0.2s;
+            border-radius: 20px; font-size: 0.9rem; transition: 0.2s; border: none; cursor: pointer;
+            width: 100%;
         }
         .btn-download:hover { background-color: #1ed760; }
     </style>
@@ -71,45 +76,173 @@
         <p>Busque e baixe músicas em MP3 diretamente</p>
     </div>
 
-    <!-- 📢 ESPAÇO DE ANÚNCIO 1: TOPO (BANNER RECTANGLE/LEADERBOARD) -->
+    <!-- 📢 ESPAÇO DE ANÚNCIO 1: TOPO -->
     <div class="ad-container">
-        <!-- Cole o código do script de anúncio aqui no futuro -->
         <span>[ Espaço reservado para Anúncio / Banner Topo ]</span>
     </div>
 
     <!-- Campo de Busca -->
     <div class="search-box">
         <form method="GET" action="{% url 'lista_musicas' %}">
-            <input type="text" name="q" placeholder="Digite o nome da música ou artista..." value="{{ query }}">
+            <input type="text" id="campo-busca" name="q" placeholder="Digite o nome da música ou artista..." value="{{ query }}">
             <button type="submit">Buscar</button>
         </form>
     </div>
 
-    <!-- 📢 ESPAÇO DE ANÚNCIO 2: NATIVO ANTES DOS RESULTADOS -->
+    <!-- 📢 ESPAÇO DE ANÚNCIO 2: ANTES DOS RESULTADOS -->
     {% if resultados %}
         <div class="ad-container" style="min-height: 60px; margin-bottom: 30px;">
-            <!-- Cole o código de anúncio nativo aqui no futuro -->
             <span>[ Espaço reservado para Anúncio Nativo ]</span>
         </div>
     {% endif %}
 
-    <!-- Resultados -->
+    <!-- Resultados da Busca -->
     {% if resultados %}
-        <div class="grid">
+        <div class="grid mb-5">
             {% for item in resultados %}
-                <div class="card">
+                <div class="card-musica">
                     <div>
                         <img src="{{ item.capa }}" alt="Capa">
                         <h3>{{ item.titulo }}</h3>
                         <p>{{ item.artista }} • {{ item.duracao }}</p>
                     </div>
-                    <a href="{% url 'baixar_musica' item.id %}" class="btn-download">⬇ Baixar MP3</a>
+
+                   {% if item.fonte == 'jamendo' %}
+                 <a href="{{ item.download_url }}" download class="btn-download" target="_blank">
+                 ⚡ Baixar MP3 Direto
+             </a>
+                  {% else %}
+                  <button onclick="baixarPeloNavegador('{{ item.id }}')" class="btn-download">
+                ⬇ Baixar MP3
+                  </button>
+                     {% endif %}
+                     </div>
+
                 </div>
             {% endfor %}
         </div>
     {% elif query %}
-        <p style="text-align: center; color: #B3B3B3;">Nenhuma música encontrada para "{{ query }}".</p>
+        <p style="text-align: center; color: #B3B3B3; margin-bottom: 40px;">
+            Nenhuma música encontrada para "{{ query }}".
+        </p>
     {% endif %}
 
+    <!-- ================= SEÇÃO DE PARTICIPAÇÕES (FEATS) ================= -->
+    <div id="secao-feats" class="container my-4" style="display: none;">
+        <h5 class="fw-bold text-light mb-2">🎤 Artistas e Participações (Feats)</h5>
+        <div id="lista-feats" class="d-flex flex-wrap gap-2">
+            <!-- Injetado dinamicamente via JS -->
+        </div>
+    </div>
+
+    <!-- ================= SEÇÃO DE RECOMENDAÇÕES ================= -->
+    <div id="secao-sugestoes" class="container my-5" style="display: none;">
+        <h5 class="fw-bold text-light mb-3">🔥 Músicas do mesmo estilo para você curtir</h5>
+        <div id="grid-sugestoes" class="row row-cols-2 row-cols-md-4 g-3">
+            <!-- Injetado dinamicamente via JS -->
+        </div>
+    </div>
+
+    <!-- ================= SCRIPT JAVASCRIPT DA INTERFACE ================= -->
+    <script>
+    // Função universal de download acionando Cobalt direto do navegador
+    async function baixarPeloNavegador(videoId) {
+        const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        alert("🔍 Preparando o áudio em alta qualidade... O download iniciará em instantes.");
+
+        try {
+            const response = await fetch("https://api.cobalt.tools/", {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    url: youtubeUrl,
+                    downloadMode: "audio",
+                    audioFormat: "mp3"
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.url) {
+                const a = document.createElement("a");
+                a.href = data.url;
+                a.download = "";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } else {
+                alert("Aviso: " + (data.text || "Não foi possível extrair o áudio no momento."));
+            }
+        } catch (error) {
+            console.error("Erro no download:", error);
+            alert("Erro de conexão ao processar o download.");
+        }
+    }
+
+    // Função para preencher a busca ao clicar num Feat ou Recomendações
+    function buscarTermo(termo) {
+        const campo = document.getElementById('campo-busca');
+        if (campo) {
+            campo.value = termo;
+            campo.form.submit();
+        }
+    }
+
+    // Função que recebe as sugestões do backend e constrói o layout
+    function exibirSugestoesEFeats(dados) {
+        // 1. Renderiza os Feats
+        const containerFeats = document.getElementById('lista-feats');
+        const secaoFeats = document.getElementById('secao-feats');
+        if (containerFeats && secaoFeats) {
+            containerFeats.innerHTML = '';
+            if (dados.feats && dados.feats.length > 0) {
+                secaoFeats.style.display = 'block';
+                dados.feats.forEach(artista => {
+                    containerFeats.innerHTML += `
+                        <span class="badge bg-success p-2 fs-6 shadow-sm" style="cursor: pointer;" onclick="buscarTermo('${artista}')">
+                            👤 ${artista}
+                        </span>
+                    `;
+                });
+            } else {
+                secaoFeats.style.display = 'none';
+            }
+        }
+
+        // 2. Renderiza as Músicas Recomendas
+        const gridSugestoes = document.getElementById('grid-sugestoes');
+        const secaoSugestoes = document.getElementById('secao-sugestoes');
+        if (gridSugestoes && secaoSugestoes) {
+            gridSugestoes.innerHTML = '';
+            if (dados.sugestoes && dados.sugestoes.length > 0) {
+                secaoSugestoes.style.display = 'block';
+                dados.sugestoes.forEach(item => {
+                    gridSugestoes.innerHTML += `
+                        <div class="col">
+                            <div class="card h-100 bg-dark text-white border-secondary shadow-sm">
+                                <img src="${item.capa}" class="card-img-top" alt="${item.titulo}" style="aspect-ratio: 1/1; object-fit: cover;">
+                                <div class="card-body p-2 d-flex flex-column justify-content-between">
+                                    <div>
+                                        <h6 class="card-title text-truncate mb-1" title="${item.titulo}">${item.titulo}</h6>
+                                        <p class="card-text small text-muted text-truncate mb-2">${item.artista}</p>
+                                    </div>
+                                    <button class="btn btn-outline-success btn-sm w-100 fw-bold" onclick="buscarTermo('${item.artista} ${item.titulo}')">
+                                        🎵 Buscar / Ouvir
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                secaoSugestoes.style.display = 'none';
+            }
+        }
+    }
+    </script>
+    
 </body>
 </html>

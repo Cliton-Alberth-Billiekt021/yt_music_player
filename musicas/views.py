@@ -74,28 +74,46 @@ def lista_musicas(request):
 
 def baixar_musica(request, video_id):
     """
-    Extrai o link de áudio via yt_dlp ou redireciona caso já seja MP3 direto (Jamendo).
+    Tenta extrair o áudio via Cobalt API. Se falhar, faz fallback para o yt_dlp.
     """
     try:
-        # 1. CURA CIRÚRGICA: Descodifica a URL (evita que 'http%3A' quebre a leitura do if)
         video_id = urllib.parse.unquote(video_id)
 
-        # 2. FIX JAMENDO DEFINITIVO: 
-        # Se o video_id for só números (ID da faixa do Jamendo), vai direto para o servidor de áudio deles
+        # 1. FIX JAMENDO DEFINITIVO
         if video_id.isdigit():
             return redirect(f"https://prod-1.storage.jamendo.com/download/track/{video_id}/mp31/")
             
-        # Se for um link direto do Jamendo (API)
         if (video_id.startswith('http://') or video_id.startswith('https://')) and 'jamendo.com' in video_id:
             return redirect(video_id)
 
-        # 3. Monta a URL para processar (SoundCloud ou YouTube)
+        # 2. Monta a URL (SoundCloud ou YouTube)
         if video_id.startswith('http://') or video_id.startswith('https://'):
             target_url = video_id
         else:
             target_url = f'https://www.youtube.com/watch?v={video_id}'
 
-        # 4. FIX SOUNDCLOUD: Passar um User-Agent burla o bloqueio de direitos autorais padrão
+        # 🚀 PLANO A: Integração com a API do Cobalt (Forte contra bloqueios)
+        try:
+            headers = {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+            payload = {
+                "url": target_url,
+                "isAudioOnly": True # Força o retorno apenas do áudio
+            }
+            
+            resposta = requests.post('https://api.cobalt.tools/api/json', headers=headers, json=payload, timeout=10)
+            
+            if resposta.status_code == 200:
+                dados = resposta.json()
+                audio_url = dados.get('url')
+                if audio_url:
+                    return redirect(audio_url)
+        except Exception as e_cobalt:
+            print(f"Cobalt falhou, pulando para yt_dlp: {e_cobalt}")
+
+        # 🛠️ PLANO B: Fallback para o yt_dlp
         ydl_opts = {
             'format': 'bestaudio/best',
             'quiet': True,
@@ -107,19 +125,20 @@ def baixar_musica(request, video_id):
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(target_url, download=False)
-            
-            # Se for uma playlist ou busca, pega a primeira entrada
             if 'entries' in info:
                 info = info['entries'][0]
-                
             audio_url = info.get('url')
-
             if audio_url:
-                # Redireciona para o link de áudio gerado
                 return redirect(audio_url)
 
         return HttpResponse("Não foi possível extrair o link de áudio dessa faixa.", status=500)
 
+    except Exception as e:
+        print(f"Erro no download: {e}")
+        # Mensagem ajustada para o usuário final
+        if 'soundcloud' in str(video_id).lower():
+            return HttpResponse("Erro: O SoundCloud bloqueou o acesso a esta música. Tente buscar uma versão alternativa ou outra faixa.", status=403)
+        return HttpResponse(f"Erro ao processar download: {str(e)}", status=500)
     except Exception as e:
         print(f"Erro no download: {e}")
         # Retorno amigável caso seja uma música Premium do SoundCloud (DRM fechado)

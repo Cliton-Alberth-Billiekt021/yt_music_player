@@ -188,7 +188,7 @@
                         </button>
                     {% else %}
                         <!-- YouTube e SoundCloud: Botão Injetado para Tocar no Player via Backend Django -->
-                        <button onclick="tocarMusica('{% url 'baixar_musica' item.id %}', '{{ item.titulo|escapejs }}', '{{ item.artista|escapejs }}')" class="btn btn-primary btn-sm mt-2 w-100 fw-bold" style="background-color: #1DB954; color: black; border: none;">
+                        <button onclick="tocarMusica('{% url "baixar_musica" item.id %}', '{{ item.titulo|escapejs }}', '{{ item.artista|escapejs }}')" class="btn btn-primary btn-sm mt-2 w-100 fw-bold" style="background-color: #1DB954; color: black; border: none;">
                             ▶️ Ouvir Agora
                         </button>
                     {% endif %}
@@ -230,15 +230,15 @@
     const progressContainer = document.getElementById('progress-container');
     const trackTitle = document.getElementById('track-title');
 
-    // Função para formatar o tempo (ex: 3:05)
+    // Função para formatar o tempo (Lida com atrasos e streams)
     function formatTime(seconds) {
-        if (isNaN(seconds)) return "0:00";
+        if (isNaN(seconds) || seconds === Infinity) return "0:00";
         const min = Math.floor(seconds / 60);
         const sec = Math.floor(seconds % 60);
         return `${min}:${sec < 10 ? '0' : ''}${sec}`;
     }
 
-    // Lógica do botão Play/Pause
+    // Ação do Botão Play/Pause principal
     playBtn.addEventListener('click', () => {
         if (!audio.src || audio.src.includes('url_do_audio_aqui')) {
             alert("Selecione uma música abaixo para reproduzir!");
@@ -247,31 +247,58 @@
         
         if (audio.paused) {
             audio.play();
-            playBtn.innerHTML = '⏸'; 
-            visualizer.classList.remove('paused');
-            statusText.innerText = "Reproduzindo agora...";
         } else {
             audio.pause();
-            playBtn.innerHTML = '▶'; 
-            visualizer.classList.add('paused');
-            statusText.innerText = "Pausado";
         }
     });
 
-    // Atualiza a barra de progresso e os tempos
+    // ========================================================
+    // EVENTOS INTELIGENTES DO ÁUDIO (Sincroniza visual e som)
+    // ========================================================
+    
+    // Quando a música realmente começar a tocar
+    audio.addEventListener('play', () => {
+        playBtn.innerHTML = '⏸'; 
+        visualizer.classList.remove('paused');
+        statusText.innerText = "Reproduzindo agora... 🎶";
+    });
+
+    // Quando for pausada
+    audio.addEventListener('pause', () => {
+        playBtn.innerHTML = '▶'; 
+        visualizer.classList.add('paused');
+        statusText.innerText = "Pausado";
+    });
+
+    // Quando estiver carregando do servidor (Cobalt / Django)
+    audio.addEventListener('waiting', () => {
+        statusText.innerText = "Baixando áudio do servidor... ⏳";
+        visualizer.classList.add('paused'); // Para as barras enquanto carrega
+    });
+
+    // Quando voltar a tocar depois de carregar
+    audio.addEventListener('playing', () => {
+        visualizer.classList.remove('paused');
+        statusText.innerText = "Reproduzindo agora... 🎶";
+    });
+
+    // Atualiza a barra verde e o relógio segundo a segundo
     audio.addEventListener('timeupdate', () => {
-        const percent = (audio.currentTime / audio.duration) * 100;
-        progressBar.style.width = percent + '%';
+        if (audio.duration && audio.duration !== Infinity) {
+            const percent = (audio.currentTime / audio.duration) * 100;
+            progressBar.style.width = percent + '%';
+        }
         currentTimeEl.innerText = formatTime(audio.currentTime);
     });
 
-    // Carrega a duração total quando a música carregar
+    // Pega a duração total da música assim que ela chega
     audio.addEventListener('loadedmetadata', () => {
         durationEl.innerText = formatTime(audio.duration);
     });
 
-    // Permite clicar na barra de progresso para avançar a música
+    // Permite clicar na barra para avançar a música
     progressContainer.addEventListener('click', (e) => {
+        if (!audio.duration || audio.duration === Infinity) return;
         const rect = progressContainer.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const width = rect.width;
@@ -279,52 +306,43 @@
         audio.currentTime = clickRatio * audio.duration;
     });
 
-    // Reseta o player quando a música termina
+    // Reseta quando a música acaba
     audio.addEventListener('ended', () => {
-        playBtn.innerHTML = '▶';
-        visualizer.classList.add('paused');
-        statusText.innerText = "Pronto para tocar novamente";
         progressBar.style.width = '0%';
         currentTimeEl.innerText = "0:00";
+        statusText.innerText = "Pronto para tocar novamente";
+        visualizer.classList.add('paused');
+        playBtn.innerHTML = '▶';
     });
 
-    // --- NOVA FUNÇÃO INJETADA PARA TOCAR A MÚSICA NO PLAYER ---
+    // ========================================================
+    // FUNÇÃO QUE É CHAMADA QUANDO CLICA EM "OUVIR AGORA"
+    // ========================================================
     function tocarMusica(url, titulo, artista) {
-        // 1. Atualiza os textos do player com o nome da música
+        // 1. Atualiza textos
         trackTitle.innerText = titulo + " - " + artista;
-        statusText.innerText = "Processando áudio... ⏳";
+        statusText.innerText = "Conectando ao servidor... ⏳";
         
-        // 2. Coloca a URL da música no player
-        audio.src = url;
-
-        // 3. Rola a tela suavemente para o usuário ver o player
+        // 2. Reseta o player visualmente
+        progressBar.style.width = '0%';
+        currentTimeEl.innerText = "0:00";
+        durationEl.innerText = "0:00";
+        
+        // 3. Rola a tela
         document.querySelector('.player-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // 4. Inicia a reprodução
-        audio.play().then(() => {
-            playBtn.innerHTML = '⏸'; 
-            visualizer.classList.remove('paused');
-            statusText.innerText = "Reproduzindo agora...";
-        }).catch(err => {
-            console.error("Aguardando carregamento da rede...", err);
-            statusText.innerText = "Áudio pronto! Clique no Play para iniciar.";
+        // 4. Carrega a URL e tenta tocar
+        audio.src = url;
+        audio.load(); // Força o navegador a buscar a música nova
+        
+        audio.play().catch(err => {
+            console.warn("Aguardando carregamento da rede ou clique do usuário:", err);
+            statusText.innerText = "Pronto! Clique no botão verde de Play ▶ para iniciar.";
+            playBtn.innerHTML = '▶';
         });
     }
 
-    // --- LÓGICA DE BUSCA, DOWNLOAD E RECOMENDAÇÕES ---
-    
-    // Função universal de download/streaming (Mantida por segurança)
-    async function baixarPeloNavegador(videoId, fonte) {
-        if (fonte === 'jamendo' || videoId.startsWith('http://') || videoId.startsWith('https://')) {
-            if (!videoId.includes('soundcloud.com')) {
-                window.open(videoId, '_blank');
-                return;
-            }
-        }
-        window.location.href = `/baixar/${encodeURIComponent(videoId)}/`;
-    }
-
-    // Função para preencher a busca ao clicar num Feat ou Recomendações
+    // --- LÓGICA DE BUSCA E RECOMENDAÇÕES (MANTIDA INTACTA) ---
     function buscarTermo(termo) {
         const campo = document.getElementById('campo-busca');
         if (campo) {
@@ -333,9 +351,7 @@
         }
     }
 
-    // Função que recebe as sugestões do backend e constrói o layout
     function exibirSugestoesEFeats(dados) {
-        // 1. Renderiza os Feats
         const containerFeats = document.getElementById('lista-feats');
         const secaoFeats = document.getElementById('secao-feats');
         if (containerFeats && secaoFeats) {
@@ -354,7 +370,6 @@
             }
         }
 
-        // 2. Renderiza as Músicas Recomendas
         const gridSugestoes = document.getElementById('grid-sugestoes');
         const secaoSugestoes = document.getElementById('secao-sugestoes');
         if (gridSugestoes && secaoSugestoes) {

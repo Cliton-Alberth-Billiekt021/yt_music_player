@@ -270,6 +270,15 @@
         statusText.innerText = "Pausado";
     });
 
+// ❌ Quando a música falha ou o servidor bloqueia o IP
+    audio.addEventListener('error', () => {
+        playBtn.innerHTML = '▶'; 
+        visualizer.classList.add('paused');
+        statusText.innerText = "❌ Erro: Link indisponível. Tente outra versão da música.";
+        progressBar.style.width = '0%';
+        currentTimeEl.innerText = "0:00";
+    });
+
     // Quando estiver carregando do servidor (Cobalt / Django)
     audio.addEventListener('waiting', () => {
         statusText.innerText = "Baixando áudio do servidor... ⏳";

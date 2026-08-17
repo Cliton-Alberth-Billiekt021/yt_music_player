@@ -73,17 +73,30 @@ def lista_musicas(request):
     })
 
 
-# 🧠 NOVA FUNÇÃO: Cria a ponte de streaming entre o servidor e o usuário
+# 🧠 NOVA FUNÇÃO: Cria a ponte de streaming com disfarce de navegador
 def transmitir_audio(url):
     try:
-        req = requests.get(url, stream=True, timeout=10)
+        # 🕵️‍♂️ O Disfarce: O Python finge ser o Google Chrome em um Windows
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Referer': 'https://www.youtube.com/'
+        }
+        
+        # Faz a requisição com o disfarce e um tempo de espera maior (15 seg)
+        req = requests.get(url, stream=True, headers=headers, timeout=15)
+        
+        # Se o servidor da música bloquear mesmo com o disfarce, avisa o erro
+        if req.status_code != 200:
+            print(f"Erro na fonte do áudio. Código HTTP: {req.status_code}")
+            
         return StreamingHttpResponse(
             req.iter_content(chunk_size=8192), 
             content_type=req.headers.get('content-type', 'audio/mpeg')
         )
     except Exception as e:
+        print(f"Erro ao transmitir: {e}")
         return HttpResponse(f"Erro no stream: {e}", status=500)
-
 
 def baixar_musica(request, video_id):
     """

@@ -182,15 +182,15 @@
                     </div>
 
                     {% if item.fonte == 'jamendo' %}
-                        <!-- Jamendo: Download MP3 direto sem passar por extrator -->
-                        <a href="{{ item.id }}" target="_blank" download class="btn btn-success btn-sm mt-2">
-                            ⚡ Baixar MP3 Direto
-                        </a>
+                        <!-- Jamendo: Botão Injetado para Tocar no Player -->
+                        <button onclick="tocarMusica('{{ item.id }}', '{{ item.titulo|escapejs }}', '{{ item.artista|escapejs }}')" class="btn btn-success btn-sm mt-2 w-100 fw-bold">
+                            ▶️ Ouvir Agora
+                        </button>
                     {% else %}
-                        <!-- YouTube e SoundCloud: Direciona para a rota /baixar/ do Django -->
-                        <a href="{% url 'baixar_musica' item.id %}" class="btn btn-primary btn-sm mt-2" style="background-color: #1DB954; color: black; border: none;">
-                            ⬇️ Baixar / Ouvir
-                        </a>
+                        <!-- YouTube e SoundCloud: Botão Injetado para Tocar no Player via Backend Django -->
+                        <button onclick="tocarMusica('{% url 'baixar_musica' item.id %}', '{{ item.titulo|escapejs }}', '{{ item.artista|escapejs }}')" class="btn btn-primary btn-sm mt-2 w-100 fw-bold" style="background-color: #1DB954; color: black; border: none;">
+                            ▶️ Ouvir Agora
+                        </button>
                     {% endif %}
                 </div>
             {% endfor %}
@@ -228,6 +228,7 @@
     const currentTimeEl = document.getElementById('current-time');
     const durationEl = document.getElementById('duration');
     const progressContainer = document.getElementById('progress-container');
+    const trackTitle = document.getElementById('track-title');
 
     // Função para formatar o tempo (ex: 3:05)
     function formatTime(seconds) {
@@ -287,9 +288,32 @@
         currentTimeEl.innerText = "0:00";
     });
 
+    // --- NOVA FUNÇÃO INJETADA PARA TOCAR A MÚSICA NO PLAYER ---
+    function tocarMusica(url, titulo, artista) {
+        // 1. Atualiza os textos do player com o nome da música
+        trackTitle.innerText = titulo + " - " + artista;
+        statusText.innerText = "Processando áudio... ⏳";
+        
+        // 2. Coloca a URL da música no player
+        audio.src = url;
+
+        // 3. Rola a tela suavemente para o usuário ver o player
+        document.querySelector('.player-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // 4. Inicia a reprodução
+        audio.play().then(() => {
+            playBtn.innerHTML = '⏸'; 
+            visualizer.classList.remove('paused');
+            statusText.innerText = "Reproduzindo agora...";
+        }).catch(err => {
+            console.error("Aguardando carregamento da rede...", err);
+            statusText.innerText = "Áudio pronto! Clique no Play para iniciar.";
+        });
+    }
+
     // --- LÓGICA DE BUSCA, DOWNLOAD E RECOMENDAÇÕES ---
     
-    // Função universal de download/streaming
+    // Função universal de download/streaming (Mantida por segurança)
     async function baixarPeloNavegador(videoId, fonte) {
         if (fonte === 'jamendo' || videoId.startsWith('http://') || videoId.startsWith('https://')) {
             if (!videoId.includes('soundcloud.com')) {

@@ -2,6 +2,7 @@ import os
 import requests
 import yt_dlp
 import urllib.parse
+from django.core.cache import cache
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, JsonResponse, Http404
 
@@ -71,49 +72,55 @@ def lista_musicas(request):
         'query': query
     })
 
-
 def baixar_musica(request, video_id):
     """
-    Tenta extrair o áudio via Cobalt API. Se falhar, faz fallback para o yt_dlp.
+    Verifica o cache. Se não encontrar, extrai via Cobalt/yt_dlp e salva no cache para os próximos usuários.
     """
     try:
         video_id = urllib.parse.unquote(video_id)
 
-        # 1. FIX JAMENDO DEFINITIVO
+        # 🧠 NOVIDADE: VERIFICA O CACHE PRIMEIRO
+        # Procura na memória se já extraímos essa música recentemente
+        chave_cache = f'musica_{video_id}'
+        url_em_cache = cache.get(chave_cache)
+        
+        if url_em_cache:
+            print(f"🔥 CACHE HIT: Música {video_id} entregue instantaneamente pela memória!")
+            return redirect(url_em_cache)
+
+        # 1. FIX JAMENDO
         if video_id.isdigit():
-            return redirect(f"https://prod-1.storage.jamendo.com/download/track/{video_id}/mp31/")
+            final_url = f"https://prod-1.storage.jamendo.com/download/track/{video_id}/mp31/"
+            cache.set(chave_cache, final_url, timeout=60*60*24) # Salva Jamendo por 24 horas
+            return redirect(final_url)
             
         if (video_id.startswith('http://') or video_id.startswith('https://')) and 'jamendo.com' in video_id:
+            cache.set(chave_cache, video_id, timeout=60*60*24)
             return redirect(video_id)
 
-        # 2. Monta a URL (SoundCloud ou YouTube)
+        # 2. Monta a URL
         if video_id.startswith('http://') or video_id.startswith('https://'):
             target_url = video_id
         else:
             target_url = f'https://www.youtube.com/watch?v={video_id}'
 
-        # 🚀 PLANO A: Integração com a API do Cobalt (Forte contra bloqueios)
+        # 🚀 PLANO A: Cobalt API
         try:
-            headers = {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
-            payload = {
-                "url": target_url,
-                "isAudioOnly": True # Força o retorno apenas do áudio
-            }
-            
+            headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+            payload = {"url": target_url, "isAudioOnly": True}
             resposta = requests.post('https://api.cobalt.tools/api/json', headers=headers, json=payload, timeout=10)
             
             if resposta.status_code == 200:
                 dados = resposta.json()
                 audio_url = dados.get('url')
                 if audio_url:
+                    # Salva a URL extraída na memória por 2 horas (7200 segundos)
+                    cache.set(chave_cache, audio_url, timeout=7200)
                     return redirect(audio_url)
         except Exception as e_cobalt:
             print(f"Cobalt falhou, pulando para yt_dlp: {e_cobalt}")
 
-        # 🛠️ PLANO B: Fallback para o yt_dlp
+        # 🛠️ PLANO B: yt_dlp
         ydl_opts = {
             'format': 'bestaudio/best',
             'quiet': True,
@@ -129,24 +136,16 @@ def baixar_musica(request, video_id):
                 info = info['entries'][0]
             audio_url = info.get('url')
             if audio_url:
+                # Salva a URL extraída na memória por 2 horas
+                cache.set(chave_cache, audio_url, timeout=7200)
                 return redirect(audio_url)
 
         return HttpResponse("Não foi possível extrair o link de áudio dessa faixa.", status=500)
 
     except Exception as e:
         print(f"Erro no download: {e}")
-        # Mensagem ajustada para o usuário final
         if 'soundcloud' in str(video_id).lower():
-            return HttpResponse("Erro: O SoundCloud bloqueou o acesso a esta música. Tente buscar uma versão alternativa ou outra faixa.", status=403)
-        return HttpResponse(f"Erro ao processar download: {str(e)}", status=500)
-    except Exception as e:
-        print(f"Erro no download: {e}")
-        # Retorno amigável caso seja uma música Premium do SoundCloud (DRM fechado)
-        if 'soundcloud' in str(video_id).lower():
-            return HttpResponse("Erro: Esta faixa específica do SoundCloud é Premium (Go+) e protegida por DRM.", status=403)
-        return HttpResponse(f"Erro ao processar download: {str(e)}", status=500)
-    except Exception as e:
-        print(f"Erro no download: {e}")
+            return HttpResponse("Erro: O SoundCloud bloqueou o acesso a esta música. Tente buscar uma versão alternativa.", status=403)
         return HttpResponse(f"Erro ao processar download: {str(e)}", status=500)
 
 def detalhe_musica(request, video_id):

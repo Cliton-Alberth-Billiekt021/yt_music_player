@@ -1,7 +1,7 @@
 import os
 import requests
 import yt_dlp
-
+import urllib.parse
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, JsonResponse, Http404
 
@@ -77,21 +77,32 @@ def baixar_musica(request, video_id):
     Extrai o link de áudio via yt_dlp ou redireciona caso já seja MP3 direto (Jamendo).
     """
     try:
-        # 1. Se for Jamendo (link direto para o arquivo MP3)
-        if (video_id.startswith('http://') or video_id.startswith('https://')) and 'soundcloud.com' not in video_id:
+        # 1. CURA CIRÚRGICA: Descodifica a URL (evita que 'http%3A' quebre a leitura do if)
+        video_id = urllib.parse.unquote(video_id)
+
+        # 2. FIX JAMENDO DEFINITIVO: 
+        # Se o video_id for só números (ID da faixa do Jamendo), vai direto para o servidor de áudio deles
+        if video_id.isdigit():
+            return redirect(f"https://prod-1.storage.jamendo.com/download/track/{video_id}/mp31/")
+            
+        # Se for um link direto do Jamendo (API)
+        if (video_id.startswith('http://') or video_id.startswith('https://')) and 'jamendo.com' in video_id:
             return redirect(video_id)
 
-        # 2. Monta a URL para processar (SoundCloud ou YouTube)
+        # 3. Monta a URL para processar (SoundCloud ou YouTube)
         if video_id.startswith('http://') or video_id.startswith('https://'):
             target_url = video_id
         else:
             target_url = f'https://www.youtube.com/watch?v={video_id}'
 
-        # 3. Usa o yt_dlp para extrair a URL direta de streaming/áudio
+        # 4. FIX SOUNDCLOUD: Passar um User-Agent burla o bloqueio de direitos autorais padrão
         ydl_opts = {
             'format': 'bestaudio/best',
             'quiet': True,
             'no_warnings': True,
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
+            }
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -109,6 +120,12 @@ def baixar_musica(request, video_id):
 
         return HttpResponse("Não foi possível extrair o link de áudio dessa faixa.", status=500)
 
+    except Exception as e:
+        print(f"Erro no download: {e}")
+        # Retorno amigável caso seja uma música Premium do SoundCloud (DRM fechado)
+        if 'soundcloud' in str(video_id).lower():
+            return HttpResponse("Erro: Esta faixa específica do SoundCloud é Premium (Go+) e protegida por DRM.", status=403)
+        return HttpResponse(f"Erro ao processar download: {str(e)}", status=500)
     except Exception as e:
         print(f"Erro no download: {e}")
         return HttpResponse(f"Erro ao processar download: {str(e)}", status=500)

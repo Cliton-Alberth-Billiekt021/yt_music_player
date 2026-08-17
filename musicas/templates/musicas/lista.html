@@ -69,6 +69,38 @@
             width: 100%;
         }
         .btn-download:hover { background-color: #1ed760; }
+
+        /* ================= ESTILOS DO LEITOR DE ÁUDIO ANIMADO ================= */
+        .visualizer .bar {
+            width: 8px;
+            background-color: #1DB954; /* Verde da identidade visual */
+            margin: 0 4px;
+            border-radius: 4px 4px 0 0;
+            animation: jump 1.2s infinite ease-in-out alternate;
+            transform-origin: bottom;
+        }
+
+        .visualizer .bar:nth-child(1) { animation-delay: 0.1s; height: 30%; }
+        .visualizer .bar:nth-child(2) { animation-delay: 0.3s; height: 70%; }
+        .visualizer .bar:nth-child(3) { animation-delay: 0.0s; height: 100%; }
+        .visualizer .bar:nth-child(4) { animation-delay: 0.2s; height: 50%; }
+        .visualizer .bar:nth-child(5) { animation-delay: 0.4s; height: 80%; }
+        .visualizer .bar:nth-child(6) { animation-delay: 0.1s; height: 40%; }
+        .visualizer .bar:nth-child(7) { animation-delay: 0.5s; height: 90%; }
+        .visualizer .bar:nth-child(8) { animation-delay: 0.2s; height: 60%; }
+        .visualizer .bar:nth-child(9) { animation-delay: 0.3s; height: 30%; }
+
+        @keyframes jump {
+            0% { transform: scaleY(0.2); opacity: 0.5; }
+            100% { transform: scaleY(1); opacity: 1; }
+        }
+
+        .visualizer.paused .bar {
+            animation-play-state: paused;
+            transform: scaleY(0.1) !important;
+            opacity: 0.3;
+            transition: transform 0.3s, opacity 0.3s;
+        }
     </style>
 </head>
 <body>
@@ -79,10 +111,10 @@
     </div>
 
     <!-- 📢 ESPAÇO DE ANÚNCIO 1: TOPO -->
-<div class="ad-container">
-    <script async="async" data-cfasync="false" src="https://pl30837138.effectivecpmnetwork.com/9f91a6b98f13dda193a74053ee8b508c/invoke.js"></script>
-    <div id="container-9f91a6b98f13dda193a74053ee8b508c"></div>
-</div>
+    <div class="ad-container">
+        <script async="async" data-cfasync="false" src="https://pl30837138.effectivecpmnetwork.com/9f91a6b98f13dda193a74053ee8b508c/invoke.js"></script>
+        <div id="container-9f91a6b98f13dda193a74053ee8b508c"></div>
+    </div>
 
     <!-- Campo de Busca -->
     <div class="search-box">
@@ -92,6 +124,42 @@
         </form>
     </div>
 
+    <!-- ================= 🎵 LEITOR DE ÁUDIO ANIMADO ================= -->
+    <div class="player-container bg-dark border border-secondary rounded p-4 mb-4 mx-auto" style="max-width: 600px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+        <div class="text-center mb-3">
+            <h5 class="text-light fw-bold" id="track-title">Pronto para Tocar</h5>
+            <small class="text-success" id="track-status">Selecione uma música abaixo</small>
+        </div>
+
+        <!-- Animação das Barras Gráficas -->
+        <div class="visualizer d-flex justify-content-center align-items-end mb-4 paused" id="visualizer" style="height: 60px;">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
+
+        <!-- O Áudio Oculto -->
+        <audio id="audio-player" src="{{ url_do_audio_aqui }}"></audio>
+
+        <!-- Controles -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-secondary small" id="current-time">0:00</span>
+            
+            <!-- Botão Play/Pause (Ativador do Popunder) -->
+            <button id="play-pause-btn" class="btn rounded-circle shadow d-flex justify-content-center align-items-center" style="width: 60px; height: 60px; font-size: 24px; background-color: #1DB954; color: black; border: none;">
+                ▶
+            </button>
+            
+            <span class="text-secondary small" id="duration">0:00</span>
+        </div>
+
+        <!-- Barra de Progresso -->
+        <div class="progress" style="height: 8px; cursor: pointer; background-color: #333;" id="progress-container">
+            <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%; background-color: #1DB954;"></div>
+        </div>
+    </div>
+    <!-- ================= FIM DO LEITOR ================= -->
+
     <!-- 📢 ESPAÇO DE ANÚNCIO 2: ANTES DOS RESULTADOS -->
     {% if resultados %}
         <div class="ad-container" style="min-height: 60px; margin-bottom: 30px;">
@@ -99,8 +167,8 @@
         </div>
     {% endif %}
 
-                        <!-- 📢 BAR SOCIAL (Colocar antes do fechamento da tag body) -->
-                    <script src="https://pl30837185.effectivecpmnetwork.com/62/aa/06/62aa06bf3f9d91c912a2f5169e762f8b.js"></script>
+    <!-- 📢 BAR SOCIAL (Colocar antes do fechamento da tag body) -->
+    <script src="https://pl30837185.effectivecpmnetwork.com/62/aa/06/62aa06bf3f9d91c912a2f5169e762f8b.js"></script>
 
     <!-- Resultados da Busca -->
     {% if resultados %}
@@ -113,19 +181,17 @@
                         <p>{{ item.artista }} • {{ item.duracao }}</p>
                     </div>
 
-                       {% if item.fonte == 'jamendo' %}
-                   <!-- Jamendo: Download MP3 direto sem passar por extrator -->
-                     <a href="{{ item.id }}" target="_blank" download class="btn btn-success btn-sm">
-                          ⚡ Baixar MP3 Direto
-                         </a>
+                    {% if item.fonte == 'jamendo' %}
+                        <!-- Jamendo: Download MP3 direto sem passar por extrator -->
+                        <a href="{{ item.id }}" target="_blank" download class="btn btn-success btn-sm mt-2">
+                            ⚡ Baixar MP3 Direto
+                        </a>
                     {% else %}
-                     <!-- YouTube e SoundCloud: Direciona para a rota /baixar/ do Django -->
-                         <a href="{% url 'baixar_musica' item.id %}" class="btn btn-primary btn-sm">
-                           ⬇️ Baixar Áudio
-                         </a>
-                        {% endif %}
-                       </div>
-
+                        <!-- YouTube e SoundCloud: Direciona para a rota /baixar/ do Django -->
+                        <a href="{% url 'baixar_musica' item.id %}" class="btn btn-primary btn-sm mt-2" style="background-color: #1DB954; color: black; border: none;">
+                            ⬇️ Baixar / Ouvir
+                        </a>
+                    {% endif %}
                 </div>
             {% endfor %}
         </div>
@@ -151,22 +217,88 @@
         </div>
     </div>
 
-    <!-- ================= SCRIPT JAVASCRIPT DA INTERFACE ================= -->
+    <!-- ================= SCRIPT JAVASCRIPT DA INTERFACE E PLAYER ================= -->
     <script>
-    // Função universal de download acionando Cobalt direto do navegador
-    async function baixarPeloNavegador(videoId, fonte) {
-    // 1. Caso seja Jamendo (já é o link MP3 direto)
-    if (fonte === 'jamendo' || videoId.startsWith('http://') || videoId.startsWith('https://')) {
-        if (!videoId.includes('soundcloud.com')) {
-            window.open(videoId, '_blank');
-            return;
-        }
+    // --- LÓGICA DO PLAYER DE ÁUDIO ANIMADO ---
+    const audio = document.getElementById('audio-player');
+    const playBtn = document.getElementById('play-pause-btn');
+    const visualizer = document.getElementById('visualizer');
+    const progressBar = document.getElementById('progress-bar');
+    const statusText = document.getElementById('track-status');
+    const currentTimeEl = document.getElementById('current-time');
+    const durationEl = document.getElementById('duration');
+    const progressContainer = document.getElementById('progress-container');
+
+    // Função para formatar o tempo (ex: 3:05)
+    function formatTime(seconds) {
+        if (isNaN(seconds)) return "0:00";
+        const min = Math.floor(seconds / 60);
+        const sec = Math.floor(seconds % 60);
+        return `${min}:${sec < 10 ? '0' : ''}${sec}`;
     }
 
-    // 2. Para YouTube e SoundCloud, redireciona para o backend Django processar
-    alert("🔍 Preparando o áudio em alta qualidade... O download iniciará em instantes.");
-    window.location.href = `/baixar/${encodeURIComponent(videoId)}/`;
-}
+    // Lógica do botão Play/Pause
+    playBtn.addEventListener('click', () => {
+        if (!audio.src || audio.src.includes('url_do_audio_aqui')) {
+            alert("Selecione uma música abaixo para reproduzir!");
+            return;
+        }
+        
+        if (audio.paused) {
+            audio.play();
+            playBtn.innerHTML = '⏸'; 
+            visualizer.classList.remove('paused');
+            statusText.innerText = "Reproduzindo agora...";
+        } else {
+            audio.pause();
+            playBtn.innerHTML = '▶'; 
+            visualizer.classList.add('paused');
+            statusText.innerText = "Pausado";
+        }
+    });
+
+    // Atualiza a barra de progresso e os tempos
+    audio.addEventListener('timeupdate', () => {
+        const percent = (audio.currentTime / audio.duration) * 100;
+        progressBar.style.width = percent + '%';
+        currentTimeEl.innerText = formatTime(audio.currentTime);
+    });
+
+    // Carrega a duração total quando a música carregar
+    audio.addEventListener('loadedmetadata', () => {
+        durationEl.innerText = formatTime(audio.duration);
+    });
+
+    // Permite clicar na barra de progresso para avançar a música
+    progressContainer.addEventListener('click', (e) => {
+        const rect = progressContainer.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const width = rect.width;
+        const clickRatio = clickX / width;
+        audio.currentTime = clickRatio * audio.duration;
+    });
+
+    // Reseta o player quando a música termina
+    audio.addEventListener('ended', () => {
+        playBtn.innerHTML = '▶';
+        visualizer.classList.add('paused');
+        statusText.innerText = "Pronto para tocar novamente";
+        progressBar.style.width = '0%';
+        currentTimeEl.innerText = "0:00";
+    });
+
+    // --- LÓGICA DE BUSCA, DOWNLOAD E RECOMENDAÇÕES ---
+    
+    // Função universal de download/streaming
+    async function baixarPeloNavegador(videoId, fonte) {
+        if (fonte === 'jamendo' || videoId.startsWith('http://') || videoId.startsWith('https://')) {
+            if (!videoId.includes('soundcloud.com')) {
+                window.open(videoId, '_blank');
+                return;
+            }
+        }
+        window.location.href = `/baixar/${encodeURIComponent(videoId)}/`;
+    }
 
     // Função para preencher a busca ao clicar num Feat ou Recomendações
     function buscarTermo(termo) {

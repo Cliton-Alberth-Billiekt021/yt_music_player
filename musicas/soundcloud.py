@@ -29,8 +29,11 @@ def buscar_musicas_soundcloud(termo_busca, limite=5):
                     segundos = int(duracao_seg % 60) if duracao_seg else 0
                     duracao_fmt = f"{minutos}:{segundos:02d}" if duracao_seg else "N/A"
 
+                    # 🧠 A CORREÇÃO ESTÁ AQUI: Priorizamos o webpage_url (Link Público)
+                    link_publico = item.get('webpage_url') or item.get('url')
+
                     resultados.append({
-                        'id': item.get('url') or item.get('webpage_url'), # URL direta do SoundCloud
+                        'id': link_publico, 
                         'titulo': item.get('title'),
                         'artista': item.get('uploader', 'SoundCloud Artist'),
                         'duracao': duracao_fmt,

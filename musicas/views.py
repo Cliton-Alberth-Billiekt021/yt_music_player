@@ -4,7 +4,7 @@ import yt_dlp
 import urllib.parse
 from django.core.cache import cache
 from django.shortcuts import render, redirect
-from django.http import HttpResponse, JsonResponse, Http404
+from django.http import HttpResponse, JsonResponse, Http404, StreamingHttpResponse
 
 from .jamendo import buscar_musicas_jamendo
 from .soundcloud import buscar_musicas_soundcloud
@@ -72,21 +72,33 @@ def lista_musicas(request):
         'query': query
     })
 
+
+# 🧠 NOVA FUNÇÃO: Cria a ponte de streaming entre o servidor e o usuário
+def transmitir_audio(url):
+    try:
+        req = requests.get(url, stream=True, timeout=10)
+        return StreamingHttpResponse(
+            req.iter_content(chunk_size=8192), 
+            content_type=req.headers.get('content-type', 'audio/mpeg')
+        )
+    except Exception as e:
+        return HttpResponse(f"Erro no stream: {e}", status=500)
+
+
 def baixar_musica(request, video_id):
     """
-    Verifica o cache. Se não encontrar, extrai via Cobalt/yt_dlp e salva no cache para os próximos usuários.
+    Verifica o cache. Se não encontrar, extrai e transmite o áudio como ponte (Proxy).
     """
     try:
         video_id = urllib.parse.unquote(video_id)
 
-        # 🧠 NOVIDADE: VERIFICA O CACHE PRIMEIRO
         # Procura na memória se já extraímos essa música recentemente
         chave_cache = f'musica_{video_id}'
         url_em_cache = cache.get(chave_cache)
         
         if url_em_cache:
-            print(f"🔥 CACHE HIT: Música {video_id} entregue instantaneamente pela memória!")
-            return redirect(url_em_cache)
+            print(f"🔥 CACHE HIT: Transmitindo música {video_id} da memória!")
+            return transmitir_audio(url_em_cache) # 👈 AGORA TRANSMITE O ÁUDIO
 
         # 1. FIX JAMENDO
         if video_id.isdigit():
@@ -114,9 +126,9 @@ def baixar_musica(request, video_id):
                 dados = resposta.json()
                 audio_url = dados.get('url')
                 if audio_url:
-                    # Salva a URL extraída na memória por 2 horas (7200 segundos)
+                    # Salva a URL extraída na memória por 2 horas
                     cache.set(chave_cache, audio_url, timeout=7200)
-                    return redirect(audio_url)
+                    return transmitir_audio(audio_url) # 👈 AGORA TRANSMITE O ÁUDIO
         except Exception as e_cobalt:
             print(f"Cobalt falhou, pulando para yt_dlp: {e_cobalt}")
 
@@ -125,6 +137,7 @@ def baixar_musica(request, video_id):
             'format': 'bestaudio/best',
             'quiet': True,
             'no_warnings': True,
+            'cookiefile': 'cookies.txt', # Mantido para autenticação se necessário
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
             }
@@ -138,7 +151,7 @@ def baixar_musica(request, video_id):
             if audio_url:
                 # Salva a URL extraída na memória por 2 horas
                 cache.set(chave_cache, audio_url, timeout=7200)
-                return redirect(audio_url)
+                return transmitir_audio(audio_url) # 👈 AGORA TRANSMITE O ÁUDIO
 
         return HttpResponse("Não foi possível extrair o link de áudio dessa faixa.", status=500)
 
@@ -147,6 +160,7 @@ def baixar_musica(request, video_id):
         if 'soundcloud' in str(video_id).lower():
             return HttpResponse("Erro: O SoundCloud bloqueou o acesso a esta música. Tente buscar uma versão alternativa.", status=403)
         return HttpResponse(f"Erro ao processar download: {str(e)}", status=500)
+
 
 def detalhe_musica(request, video_id):
     """

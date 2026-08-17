@@ -188,7 +188,7 @@
                         </button>
                     {% else %}
                         <!-- YouTube e SoundCloud: Botão Injetado para Tocar no Player via Backend Django -->
-                        <button onclick="tocarMusica('{% url "baixar_musica" item.id %}', '{{ item.titulo|escapejs }}', '{{ item.artista|escapejs }}')" class="btn btn-primary btn-sm mt-2 w-100 fw-bold" style="background-color: #1DB954; color: black; border: none;">
+                        <button onclick="tocarMusica('{% url 'baixar_musica' item.id %}', '{{ item.titulo|escapejs }}', '{{ item.artista|escapejs }}')" class="btn btn-primary btn-sm mt-2 w-100 fw-bold" style="background-color: #1DB954; color: black; border: none;">
                             ▶️ Ouvir Agora
                         </button>
                     {% endif %}
